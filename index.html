@@ -1,30 +1,232 @@
 <!DOCTYPE html>
 <html lang="es">
-  <head>
-    <meta charset="UTF-8" />
-    <title>Listado de Alumnos</title>
-    <link rel="stylesheet" href="style.css" />
-    <script defer src="test.js"></script>
-  </head>
-  <body>
-    <h1>Listado de Alumnos</h1>
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>TP Entregable - Gestión de Usuarios</title>
+    <style>
+        body { font-family: sans-serif; padding: 20px; max-width: 900px; margin: 0 auto; }
+        h1, h2 { color: #333; }
+        
+        /* Estilos del Formulario */
+        .form-container { background: #f4f4f4; padding: 15px; border-radius: 8px; margin-bottom: 20px; }
+        .form-group { margin-bottom: 10px; }
+        label { display: block; margin-bottom: 5px; font-weight: bold; }
+        input, select { width: 100%; padding: 8px; box-sizing: border-box; }
+        button { padding: 10px 15px; cursor: pointer; background-color: #007bff; color: white; border: none; border-radius: 4px; }
+        button:hover { background-color: #0056b3; }
+        button.cancel { background-color: #6c757d; display: none; } /* Oculto por defecto */
 
-    <table border="1" id="object-table">
-      <thead>
-        <tr>
-          <th>ID</th>
-          <th>Nombre</th>
-          <th>Apellido</th>
-          <th>Email</th>
-          <th>Género</th>
-          <th>Acciones</th>
-        </tr>
-      </thead>
-      <tbody id="object-list">
-        <!-- Aquí JS va a insertar las filas -->
-      </tbody>
+        /* Estilos de la Tabla */
+        table { width: 100%; border-collapse: collapse; margin-top: 20px; }
+        th, td { border: 1px solid #ddd; padding: 8px; text-align: left; }
+        th { background-color: #007bff; color: white; }
+        .actions { display: flex; gap: 5px; }
+        .btn-edit { background-color: #ffc107; color: #000; padding: 5px 10px; }
+        .btn-delete { background-color: #dc3545; padding: 5px 10px; }
+    </style>
+</head>
+<body>
+
+    <h1>Gestión de Usuarios (TP Entregable)</h1>
+
+    <div class="form-container">
+        <h2 id="formTitle">Agregar Nuevo Usuario</h2>
+        <form id="userForm">
+            <input type="hidden" id="userId"> <div class="form-group">
+                <label>First Name:</label>
+                <input type="text" id="firstName" required placeholder="Ej: Nombre">
+            </div>
+            <div class="form-group">
+                <label>Last Name:</label>
+                <input type="text" id="lastName" required placeholder="Ej: Apellido">
+            </div>
+            <div class="form-group">
+                <label>Email:</label>
+                <input type="email" id="email" required placeholder="Ej: email@test.com">
+            </div>
+            <div class="form-group">
+                <label>Gender:</label>
+                <select id="gender" required>
+                    <option value="Female">Female</option>
+                    <option value="Male">Male</option>
+                    <option value="Non-binary">Non-binary</option>
+                </select>
+            </div>
+            <div class="form-group">
+                <label>Last Connected Address (IP):</label>
+                <input type="text" id="address" placeholder="Ej: 192.168.1.1">
+            </div>
+
+            <button type="submit" id="btnSubmit">Guardar Usuario</button>
+            <button type="button" id="btnCancel" class="cancel" onclick="resetForm()">Cancelar Edición</button>
+        </form>
+    </div>
+
+    <h2>Listado de Usuarios</h2>
+    <table id="usersTable">
+        <thead>
+            <tr>
+                <th>ID</th>
+                <th>First Name</th>
+                <th>Last Name</th>
+                <th>Email</th>
+                <th>Gender</th>
+                <th>Acciones</th>
+            </tr>
+        </thead>
+        <tbody>
+            </tbody>
     </table>
-    <!-- Link para ir a la página del formulario -->
-    <a href="form.html">Agregar nuevo objeto</a>
-  </body>
+
+    <script>
+        // ---------------- CONFIGURACIÓN ----------------
+        const API_URL = 'https://5620-181-230-219-190.ngrok.io/student'; 
+
+        // Referencias al DOM
+        const tableBody = document.querySelector('#usersTable tbody');
+        const userForm = document.getElementById('userForm');
+        const btnSubmit = document.getElementById('btnSubmit');
+        const btnCancel = document.getElementById('btnCancel');
+        const formTitle = document.getElementById('formTitle');
+
+        // ---------------- FUNCIONES PRINCIPALES ----------------
+
+        // 1. Obtener y mostrar listado (GET /getAll) 
+        async function cargarUsuarios() {
+            try {
+                const response = await fetch(`${API_URL}/getAll`);
+                if (!response.ok) throw new Error('Error al obtener datos');
+                
+                const usuarios = await response.json();
+                renderTable(usuarios);
+            } catch (error) {
+                console.error(error);
+                alert('Error cargando usuarios (Revisar consola y URL de API)');
+            }
+        }
+
+        // Función auxiliar para pintar la tabla
+        function renderTable(usuarios) {
+            tableBody.innerHTML = ''; // Limpiar tabla
+            usuarios.forEach(user => {
+                const row = document.createElement('tr');
+                row.innerHTML = `
+                    <td>${user.userId}</td>
+                    <td>${user.firstName}</td>
+                    <td>${user.lastName}</td>
+                    <td>${user.email}</td>
+                    <td>${user.gender}</td>
+                    <td class="actions">
+                        <button class="btn-edit" onclick="prepararEdicion(${user.userId})">Editar</button>
+                        <button class="btn-delete" onclick="eliminarUsuario(${user.userId})">Borrar</button>
+                    </td>
+                `;
+                tableBody.appendChild(row);
+            });
+        }
+
+        // 2. Manejar el Submit (Crear O Actualizar)
+        userForm.addEventListener('submit', async (e) => {
+            e.preventDefault();
+
+            const userData = {
+                firstName: document.getElementById('firstName').value,
+                lastName: document.getElementById('lastName').value,
+                email: document.getElementById('email').value,
+                gender: document.getElementById('gender').value,
+                lastConnectedAddress: document.getElementById('address').value
+            };
+
+            const id = document.getElementById('userId').value; // Si tiene valor, es edición
+
+            try {
+                let url, method;
+
+                if (id) {
+                    // MODO ACTUALIZAR: POST /{id}/update
+                    url = `${API_URL}/${id}/update`;
+                    method = 'POST'; 
+                    // Nota: Agregamos el ID al objeto por si el backend lo requiere
+                    userData.userId = id; 
+                } else {
+                    // MODO CREAR: POST / 
+                    url = `${API_URL}/`;
+                    method = 'POST';
+                }
+
+                const response = await fetch(url, {
+                    method: method,
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(userData)
+                });
+
+                if (response.ok) {
+                    alert(id ? 'Usuario actualizado' : 'Usuario creado');
+                    resetForm();
+                    cargarUsuarios(); // Recargar la tabla
+                } else {
+                    alert('Error en la operación');
+                }
+
+            } catch (error) {
+                console.error(error);
+                alert('Error de red');
+            }
+        });
+
+        // 3. Eliminar Usuario (POST /{id}/delete) 
+        async function eliminarUsuario(id) {
+            if (!confirm('¿Estás seguro de eliminar este usuario?')) return;
+
+            try {
+                const response = await fetch(`${API_URL}/${id}/delete`, {
+                    method: 'POST' 
+                });
+
+                if (response.ok) {
+                    alert('Usuario eliminado');
+                    cargarUsuarios();
+                } else {
+                    alert('No se pudo eliminar');
+                }
+            } catch (error) {
+                console.error(error);
+            }
+        }
+
+        // 4. Preparar formulario para edición
+        // Esta función NO llama a la API, solo llena los inputs con datos existentes
+        function prepararEdicion(id) {
+            // Buscamos los datos actuales de la fila
+            const row = Array.from(document.querySelectorAll('tr')).find(r => r.children[0].textContent == id);
+            if (!row) return;
+
+            const cols = row.children;
+            
+            document.getElementById('userId').value = id;
+            document.getElementById('firstName').value = cols[1].textContent;
+            document.getElementById('lastName').value = cols[2].textContent;
+            document.getElementById('email').value = cols[3].textContent;
+            document.getElementById('gender').value = cols[4].textContent;
+            
+            // Cambiar interfaz a modo "Edición"
+            formTitle.textContent = `Editando Usuario ID: ${id}`;
+            btnSubmit.textContent = "Actualizar Usuario";
+            btnCancel.style.display = 'inline-block';
+        }
+
+        function resetForm() {
+            userForm.reset();
+            document.getElementById('userId').value = '';
+            formTitle.textContent = "Agregar Nuevo Usuario";
+            btnSubmit.textContent = "Guardar Usuario";
+            btnCancel.style.display = 'none';
+        }
+
+        // Cargar usuarios al iniciar
+        cargarUsuarios();
+
+    </script>
+</body>
 </html>
